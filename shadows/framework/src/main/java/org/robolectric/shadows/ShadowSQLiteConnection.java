@@ -51,8 +51,10 @@ import org.robolectric.annotation.Implementation;
 import org.robolectric.annotation.Implements;
 import org.robolectric.annotation.Resetter;
 import org.robolectric.shadows.util.SQLiteLibraryLoader;
+import org.robolectric.util.PerfStatsCollector;
 
-@Implements(value = android.database.sqlite.SQLiteConnection.class, isInAndroidSdk = false)
+/** Shadow for {@link android.database.sqlite.SQLiteConnection} that is backed by sqlite4java. */
+@Implements(className = "android.database.sqlite.SQLiteConnection", isInAndroidSdk = false)
 public class ShadowSQLiteConnection {
 
   private static final String IN_MEMORY_PATH = ":memory:";
@@ -736,13 +738,19 @@ static class Connections {
       final SQLiteConnection connection = getConnection(connectionPtr);
       final SQLiteStatement statement = getStatement(connectionPtr, statementPtr);
 
-      return execute("execute for changed row count", new Callable<Integer>() {
-        @Override
-        public Integer call() throws Exception {
-          statement.stepThrough();
-          return connection.getChanges();
-        }
-      });
+        return execute(
+            "execute for changed row count",
+            new Callable<Integer>() {
+              @Override
+              public Integer call() throws Exception {
+                if (statement.step()) {
+                  throw new android.database.sqlite.SQLiteException(
+                      "Queries can be performed using SQLiteDatabase query or rawQuery methods"
+                          + " only.");
+                }
+                return connection.getChanges();
+              }
+            });
     }
   }
 
@@ -814,7 +822,8 @@ static class Connections {
    */
   private <T> T execute(final String comment, final Callable<T> work) {
     synchronized (lock) {
-      return getFuture(comment, dbExecutor.submit(work));
+        return PerfStatsCollector.getInstance()
+            .measure("sqlite", () -> getFuture(comment, dbExecutor.submit(work)));
     }
   }
 
@@ -829,6 +838,8 @@ static class Connections {
               getSqliteException("Cannot " + comment, ((SQLiteException) t).getBaseErrorCode());
         sqlException.initCause(e);
         throw sqlException;
+        } else if (t instanceof android.database.sqlite.SQLiteException) {
+          throw (android.database.sqlite.SQLiteException) t;
       } else {
         throw new RuntimeException(e);
       }
