@@ -10,6 +10,7 @@ import java.lang.reflect.Method;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +26,7 @@ import org.robolectric.android.AndroidSdkShadowMatcher;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.LooperMode;
 import org.robolectric.annotation.LooperMode.Mode;
+import org.robolectric.annotation.SQLiteMode;
 import org.robolectric.config.AndroidConfigurer;
 import org.robolectric.interceptors.AndroidInterceptors;
 import org.robolectric.internal.AndroidSandbox;
@@ -52,6 +54,8 @@ import org.robolectric.pluginapi.config.ConfigurationStrategy;
 import org.robolectric.pluginapi.config.ConfigurationStrategy.Configuration;
 import org.robolectric.pluginapi.config.GlobalConfigProvider;
 import org.robolectric.plugins.HierarchicalConfigurationStrategy.ConfigurationImpl;
+import org.robolectric.shadows.ShadowNativeCursorWindow;
+import org.robolectric.shadows.ShadowNativeSQLiteConnection;
 import org.robolectric.util.Logger;
 import org.robolectric.util.PerfStatsCollector;
 import org.robolectric.util.ReflectionHelpers;
@@ -527,9 +531,23 @@ public class RobolectricTestRunner extends SandboxTestRunner {
   @Override
   @Nonnull
   protected Class<?>[] getExtraShadows(FrameworkMethod frameworkMethod) {
-    Config config =
-        ((RobolectricFrameworkMethod) frameworkMethod).getConfiguration().get(Config.class);
-    return config.shadows();
+    ArrayList<Class<?>> extraShadows = new ArrayList<>();
+    RobolectricFrameworkMethod roboFrameworkMethod = (RobolectricFrameworkMethod) frameworkMethod;
+    maybeAddSQLiteShadows(roboFrameworkMethod, extraShadows);
+    Config config = roboFrameworkMethod.getConfiguration().get(Config.class);
+    Collections.addAll(extraShadows, config.shadows());
+    return extraShadows.toArray(new Class<?>[] {});
+  }
+
+  // Leverage custom shadow mechanism for the SQLite mode. This prevents the need to create new
+  // sandboxes for SQLite modes.
+  private void maybeAddSQLiteShadows(
+      RobolectricFrameworkMethod roboFrameworkMethod, ArrayList<Class<?>> extraShadows) {
+    SQLiteMode.Mode sqliteMode = roboFrameworkMethod.getConfiguration().get(SQLiteMode.Mode.class);
+    if (sqliteMode == SQLiteMode.Mode.NATIVE) {
+      extraShadows.add(ShadowNativeSQLiteConnection.class);
+      extraShadows.add(ShadowNativeCursorWindow.class);
+    }
   }
 
   @Override
