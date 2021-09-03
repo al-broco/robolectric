@@ -23,12 +23,14 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.database.Cursor;
+import android.hardware.display.DisplayManagerGlobal;
 import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.text.Selection;
 import android.text.SpannableStringBuilder;
+import android.view.Display;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -93,15 +95,34 @@ public class ShadowActivity extends ShadowContextThemeWrapper {
   }
 
   public void callAttach(Intent intent) {
-    callAttach(intent, /*lastNonConfigurationInstances=*/ null);
+    callAttach(intent, /*activityOptions=*/ null, /*lastNonConfigurationInstances=*/ null);
+  }
+
+  public void callAttach(Intent intent, @Nullable Bundle activityOptions) {
+    callAttach(
+        intent, /*activityOptions=*/ activityOptions, /*lastNonConfigurationInstances=*/ null);
   }
 
   public void callAttach(
       Intent intent,
+      @Nullable Bundle activityOptions,
       @Nullable @WithType("android.app.Activity$NonConfigurationInstances")
           Object lastNonConfigurationInstances) {
     Application application = RuntimeEnvironment.getApplication();
     Context baseContext = application.getBaseContext();
+
+    if (activityOptions != null && VERSION.SDK_INT >= VERSION_CODES.O) {
+      int displayId = ShadowActivityOptions.fromBundle(activityOptions).getLaunchDisplayId();
+      if (displayId != Display.DEFAULT_DISPLAY
+          // INVALID_DISPLAY indicates no display was set in the options bundle
+          && displayId != Display.INVALID_DISPLAY) {
+        Display display = DisplayManagerGlobal.getInstance().getRealDisplay(displayId);
+        if (display == null) {
+          throw new IllegalArgumentException("Requested display does not exist: " + displayId);
+        }
+        baseContext = baseContext.createDisplayContext(display);
+      }
+    }
 
     ComponentName componentName =
         new ComponentName(application.getPackageName(), realActivity.getClass().getName());

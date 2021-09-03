@@ -16,6 +16,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.robolectric.Robolectric.buildActivity;
@@ -1240,6 +1241,36 @@ public class ShadowActivityTest {
     Activity activity = Robolectric.setupActivity(Activity.class);
     shadowOf(activity).initializeVoiceInteractor();
     assertThat(activity.getVoiceInteractor()).isNotNull();
+  }
+
+  @Test
+  @Config(minSdk = O)
+  public void buildActivity_noSpecifiedDisplay_succeedsOnDefaultDisplay() {
+    Activity activity = Robolectric.buildActivity(Activity.class, null).setup().get();
+    assertThat(activity.getWindowManager().getDefaultDisplay().getDisplayId())
+        .isEqualTo(Display.DEFAULT_DISPLAY);
+  }
+
+  @Test
+  @Config(minSdk = O)
+  public void buildActivity_specifiedExistingDisplay_succeeds() {
+    int displayId = ShadowDisplayManager.addDisplay("");
+    Activity activity =
+        Robolectric.buildActivity(
+                Activity.class,
+                null,
+                ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle())
+            .setup()
+            .get();
+    assertThat(activity.getWindowManager().getDefaultDisplay().getDisplayId()).isEqualTo(displayId);
+  }
+
+  @Test
+  @Config(minSdk = O)
+  public void buildActivity_specifiedNonExistentDisplay_fails() {
+    assertThrows(IllegalArgumentException.class, () ->
+      Robolectric.buildActivity(
+          Activity.class, null, ActivityOptions.makeBasic().setLaunchDisplayId(123).toBundle()));
   }
 
   /////////////////////////////

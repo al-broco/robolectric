@@ -31,12 +31,12 @@ public class LocalActivityInvoker implements ActivityInvoker {
 
   @Override
   public void startActivity(Intent intent, @Nullable Bundle activityOptions) {
-    startActivity(intent);
+    controller = getInstrumentation().startActivitySyncInternal(intent, activityOptions);
   }
 
   @Override
   public void startActivity(Intent intent) {
-    controller = getInstrumentation().startActivitySyncInternal(intent);
+    startActivity(intent, null);
   }
 
   @Override

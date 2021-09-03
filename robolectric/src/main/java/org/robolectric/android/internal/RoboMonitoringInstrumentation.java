@@ -27,6 +27,7 @@ import androidx.test.runner.lifecycle.ApplicationStage;
 import androidx.test.runner.lifecycle.Stage;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.robolectric.Robolectric;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.android.controller.ActivityController;
@@ -79,6 +80,11 @@ public class RoboMonitoringInstrumentation extends Instrumentation {
   }
 
   public ActivityController<? extends Activity> startActivitySyncInternal(Intent intent) {
+    return startActivitySyncInternal(intent, null);
+  }
+
+  public ActivityController<? extends Activity> startActivitySyncInternal(
+      Intent intent, @Nullable Bundle activityOptions) {
     ActivityInfo ai = intent.resolveActivityInfo(getTargetContext().getPackageManager(), 0);
     if (ai == null) {
       throw new RuntimeException("Unable to resolve activity for " + intent
@@ -94,7 +100,7 @@ public class RoboMonitoringInstrumentation extends Instrumentation {
     }
 
     ActivityController<? extends Activity> controller = Robolectric
-        .buildActivity(activityClass, intent)
+        .buildActivity(activityClass, intent, activityOptions)
         .create();
     if (controller.get().isFinishing()) {
       controller.destroy();
